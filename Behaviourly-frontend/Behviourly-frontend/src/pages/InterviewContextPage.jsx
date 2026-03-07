@@ -22,7 +22,6 @@ const PLACEHOLDER_CONTEXT = {
   ],
   tailoredTips: ["{{tip_1}}", "{{tip_2}}", "{{tip_3}}"],
   likelyInterviewFocus: ["{{focus_1}}", "{{focus_2}}", "{{focus_3}}"],
-  confidenceNote: "{{confidence_note}}",
 };
 
 function SectionList({ title, items }) {
@@ -89,11 +88,6 @@ export default function InterviewContextPage() {
           items={PLACEHOLDER_CONTEXT.likelyInterviewFocus}
         />
       </div>
-
-      <section className="interview-context-card interview-context-confidence">
-        <h3>Confidence Note</h3>
-        <p>{PLACEHOLDER_CONTEXT.confidenceNote}</p>
-      </section>
 
       <div className="interview-context-actions">
         <button type="button" onClick={() => navigate("/home")}>Back to dashboard</button>
