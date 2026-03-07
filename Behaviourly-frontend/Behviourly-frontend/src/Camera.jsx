@@ -1,87 +1,87 @@
-import { useEffect, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 
-export default function Camera({ onRecordingComplete }){
-    const videoRef = useRef(null);
-    const mediaRecorderRef = useRef(null);
-    const checksref = useRef([]);
-    const [cameraReady, setCameraReady] = useState(false);
-    const [recording, setRecording] = useState(false);
-    cosnt [error, setError] = useState(null);
-}
+export default function Camera({ onRecordingComplete }) {
+  const videoRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
 
-// start the camera up 
-useEffect(() => {
+  const [cameraReady, setCameraReady] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState(null);
+
+  // ─────────────────────────────────────────────
+  // Start camera on mount
+  // ─────────────────────────────────────────────
+  useEffect(() => {
     startCamera();
-    return () =>  stopCamera();
-}, []);
+    return () => stopCamera();
+  }, []);
 
-async function startCamera(){
-    try{
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-        });
-
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        setCameraReady(true);
-    } catch(err) {
-        setError("Camera Access denied. Please allow for camera permisions.");
-        console.error("Camera error:", err)
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      videoRef.current.srcObject = stream;
+      videoRef.current.play();
+      setCameraReady(true);
+    } catch (err) {
+      setError("Camera access denied. Please allow camera permissions.");
+      console.error("Camera error:", err);
     }
-}
+  }
 
-
-function stopCamera() {
+  function stopCamera() {
     const stream = videoRef.current?.srcObject;
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
-}
+  }
 
-
-// start recording
-function startRecording(){
+  // ─────────────────────────────────────────────
+  // Start recording
+  // ─────────────────────────────────────────────
+  function startRecording() {
     const stream = videoRef.current.srcObject;
     chunksRef.current = [];
 
-    const mediaRecorder = new Mediarecorder(stream, {
-        mimeType: "video/webm",
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "video/webm",
     });
 
     mediaRecorder.ondataavailable = (e) => {
-        if(e.data.size > 0) chunksRef.current.push(e.data);
+      if (e.data.size > 0) chunksRef.current.push(e.data);
     };
 
-    mediaRecorder.onStop = () => {
-        const blob = new Blob(checkRef.current, {
-            type: "video/webm"
-        });
-    
-        const url = URL.createObjectURL(blob);
-        if (onRecordingComplete) onRecordingComplete(blob, url);
-    }; 
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      if (onRecordingComplete) onRecordingComplete(blob, url);
+    };
 
     mediaRecorderRef.current = mediaRecorder;
     mediaRecorder.start(1000);
     setRecording(true);
-}
+  }
 
-// stop recording
-function stopRecording() {
+  // ─────────────────────────────────────────────
+  // Stop recording
+  // ─────────────────────────────────────────────
+  function stopRecording() {
     mediaRecorderRef.current?.stop();
     setRecording(false);
-}
+  }
 
-if(error){
-    return(
-        <div style={StyleSheet.error}>
-            <p>{error}</p>
-        </div>
-    )
-}
+  if (error) {
+    return (
+      <div style={styles.error}>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
-return (
+  return (
     <div style={styles.container}>
       {/* Live camera feed */}
       <video ref={videoRef} muted playsInline style={styles.video} />
@@ -109,6 +109,7 @@ return (
       </div>
     </div>
   );
+}
 
 const styles = {
   container: {
