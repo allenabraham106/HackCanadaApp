@@ -79,6 +79,9 @@ Create `.env` at the repo root (or in `hackcanada-backend/` for backend-only loc
 GEMINI_API_KEY=...
 OPENAI_API_KEY=...
 PRESAGE_API_KEY=...
+ELEVENLABS_API_KEY=...
+ELEVENLABS_VOICE_ID=...
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 
 # Auth0 / Flask auth service
 AUTH0_DOMAIN=...
@@ -106,6 +109,8 @@ Create `Behaviourly-frontend/Behviourly-frontend/.env` if you need overrides:
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8001
 VITE_AUTH_API_BASE_URL=http://localhost:8000
+VITE_ELEVENLABS_VOICE_ID= # optional override; backend ELEVENLABS_VOICE_ID is default
+VITE_ELEVENLABS_MODEL_ID= # optional override; backend ELEVENLABS_MODEL_ID is default
 ```
 
 ## Installation
@@ -166,6 +171,7 @@ npm run dev --prefix Behaviourly-frontend/Behviourly-frontend
 - `POST /mock-interview` - generate interview questions
 - `POST /gemini/analyze-video` - analyze uploaded answer video
 - `POST /transcribe` - transcript extraction from uploaded media
+- `POST /tts` - ElevenLabs text-to-speech proxy (returns audio)
 - `POST /analyze-answer` - evaluate answer quality for a question
 - `POST /presage/analyze` - optional physiology analysis from video
 - `POST /report` - generate final interview report

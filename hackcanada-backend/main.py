@@ -11,7 +11,7 @@ import requests as requests_sync
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from google import genai
 from google.genai import types
 
@@ -31,7 +31,7 @@ if os.path.isfile(_load_env_root):
 
 # Fallback: read .env line by line and set GEMINI + OPENAI if missing (handles encoding/quirks/BOM)
 def _load_env_keys():
-    want = {"GEMINI_API_KEY", "OPENAI_API_KEY"}
+    want = {"GEMINI_API_KEY", "OPENAI_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID"}
     have = {k for k in want if (os.environ.get(k) or "").strip()}
     if have == want:
         return
@@ -49,12 +49,9 @@ def _load_env_keys():
                     val = val.strip().strip("'\"").strip()
                     if not val:
                         continue
-                    if key == "GEMINI_API_KEY" and "GEMINI_API_KEY" not in have:
-                        os.environ["GEMINI_API_KEY"] = val
-                        have.add("GEMINI_API_KEY")
-                    if key == "OPENAI_API_KEY" and "OPENAI_API_KEY" not in have:
-                        os.environ["OPENAI_API_KEY"] = val
-                        have.add("OPENAI_API_KEY")
+                    if key in want and key not in have:
+                        os.environ[key] = val
+                        have.add(key)
                     if have == want:
                         return
         except Exception:
@@ -639,6 +636,65 @@ async def transcribe(video: UploadFile = File(...)):
             except Exception:
                 continue
         return JSONResponse({"transcript": None, "error": str(e)[:120]}, status_code=502)
+
+
+@app.post("/tts")
+async def text_to_speech(body: dict):
+    text = (body.get("text") or "").strip()
+    if not text:
+        return JSONResponse({"error": "text is required"}, status_code=400)
+
+    elevenlabs_key = _env("ELEVENLABS_API_KEY")
+    if not elevenlabs_key:
+        return JSONResponse({"error": "ELEVENLABS_API_KEY not set"}, status_code=503)
+
+    voice_id = (body.get("voice_id") or _env("ELEVENLABS_VOICE_ID")).strip()
+    if not voice_id:
+        return JSONResponse({"error": "voice_id is required (body.voice_id or ELEVENLABS_VOICE_ID)"}, status_code=400)
+
+    model_id = (body.get("model_id") or _env("ELEVENLABS_MODEL_ID") or "eleven_multilingual_v2").strip()
+    output_format = (body.get("output_format") or _env("ELEVENLABS_OUTPUT_FORMAT") or "mp3_44100_128").strip()
+    voice_settings = body.get("voice_settings") if isinstance(body.get("voice_settings"), dict) else None
+
+    payload = {
+        "text": text,
+        "model_id": model_id,
+    }
+    if voice_settings:
+        payload["voice_settings"] = voice_settings
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
+    params = {"output_format": output_format}
+
+    try:
+        resp = await asyncio.to_thread(
+            requests_sync.post,
+            url,
+            params=params,
+            json=payload,
+            headers={
+                "xi-api-key": elevenlabs_key,
+                "accept": "audio/mpeg",
+                "content-type": "application/json",
+            },
+            timeout=30,
+        )
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to contact ElevenLabs: {str(e)[:160]}"}, status_code=502)
+
+    if not resp.ok:
+        detail = (resp.text or "")[:300]
+        return JSONResponse(
+            {
+                "error": "ElevenLabs TTS request failed",
+                "status_code": resp.status_code,
+                "detail": detail,
+            },
+            status_code=502,
+        )
+
+    media_type = resp.headers.get("content-type", "audio/mpeg")
+    return Response(content=resp.content, media_type=media_type)
 
 
 @app.post("/analyze-answer")
