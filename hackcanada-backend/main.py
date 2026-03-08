@@ -7,10 +7,13 @@ import json
 from typing import Optional
 from datetime import datetime
 from dotenv import load_dotenv
+from interview_context import router as interview_context_router
 
 load_dotenv()
 
 app = FastAPI()
+
+app.include_router(interview_context_router)
 
 #allows us to connect to apps
 app.add_middleware(
@@ -22,6 +25,7 @@ app.add_middleware(
 
 # Configure Gemini
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+app.state.gemini_model = client
 
 # Default model for deeper analysis endpoints (report, answer analysis, etc.)
 MODEL = "gemini-3.1-pro-preview"
@@ -220,4 +224,3 @@ async def websocket_live(websocket: WebSocket):
             )
     except WebSocketDisconnect:
         print("Client disconnected")
-

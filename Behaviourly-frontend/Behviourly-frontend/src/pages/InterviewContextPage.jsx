@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./InterviewContextPage.css";
 
@@ -162,7 +163,7 @@ export default function InterviewContextPage() {
         <button
           type="button"
           className="interview-context-primary"
-          onClick={() => navigate("/interview", { state: { company: companyName, role: roleTitle } })}
+          onClick={() => navigate("/interview", { state: { company, role } })}
         >
           Start Practice Interview
         </button>
