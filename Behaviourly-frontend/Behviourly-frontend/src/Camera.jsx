@@ -3,35 +3,38 @@ import "./Camera.css";
 
 const Camera = forwardRef(function Camera({ onRecordingComplete, onCameraReady, externalControls = false }, ref) {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const stopResolveRef = useRef(null);
+  const mountedRef = useRef(false);
 
   const [cameraReady, setCameraReady] = useState(false);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    startCamera();
-    return () => stopCamera();
-  }, []);
-
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === "hidden" && mediaRecorderRef.current?.state === "recording") {
-        stopRecording();
-      }
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
+  function stopStream(stream) {
+    stream?.getTracks?.().forEach((track) => track.stop());
+  }
 
   async function startCamera() {
+    setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 8, max: 10 } },
         audio: true,
       });
+
+      if (!mountedRef.current) {
+        stopStream(stream);
+        return;
+      }
+
+      if (streamRef.current && streamRef.current !== stream) {
+        stopStream(streamRef.current);
+      }
+
+      streamRef.current = stream;
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
@@ -40,31 +43,109 @@ const Camera = forwardRef(function Camera({ onRecordingComplete, onCameraReady, 
       setCameraReady(true);
       onCameraReady?.();
     } catch (err) {
-      setError("Camera access denied. Please allow camera permissions.");
+      if (mountedRef.current) {
+        setCameraReady(false);
+        setError("Camera access denied. Please allow camera permissions.");
+      }
+      cleanupCameraSession();
       console.error("Camera error:", err);
     }
   }
 
-  function stopCamera() {
-    const stream = videoRef.current?.srcObject;
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      if (videoRef.current) videoRef.current.srcObject = null;
+  function cleanupCameraSession() {
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") {
+      mr.ondataavailable = null;
+      mr.onstop = null;
+      try {
+        mr.stop();
+      } catch {
+        // no-op: recorder may already be stopping
+      }
+    }
+
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
+    if (stopResolveRef.current) {
+      stopResolveRef.current({ blob: null, url: null });
+      stopResolveRef.current = null;
+    }
+
+    stopStream(streamRef.current);
+    streamRef.current = null;
+
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject = null;
+    }
+
+    if (mountedRef.current) {
+      setCameraReady(false);
+      setRecording(false);
     }
   }
 
+  useEffect(() => {
+    mountedRef.current = true;
+    const frameId = window.requestAnimationFrame(() => {
+      startCamera();
+    });
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      mountedRef.current = false;
+      cleanupCameraSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        cleanupCameraSession();
+      } else if (document.visibilityState === "visible" && !streamRef.current && mountedRef.current) {
+        startCamera();
+      }
+    }
+
+    function handlePageLeave() {
+      cleanupCameraSession();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageLeave);
+    window.addEventListener("beforeunload", handlePageLeave);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageLeave);
+      window.removeEventListener("beforeunload", handlePageLeave);
+    };
+  }, []);
+
   function startRecording() {
+    if (mediaRecorderRef.current?.state === "recording") return;
+
     const stream = videoRef.current?.srcObject;
     if (!stream) return;
     chunksRef.current = [];
 
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: "video/webm",
-      videoBitsPerSecond: 350000,
-      audioBitsPerSecond: 64000,
-    });
+    let mediaRecorder;
+    try {
+      mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "video/webm",
+        videoBitsPerSecond: 350000,
+        audioBitsPerSecond: 64000,
+      });
+    } catch (err) {
+      setError("Recording could not start. Please retry camera permissions.");
+      cleanupCameraSession();
+      console.error("Recorder setup error:", err);
+      return;
+    }
+
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    mediaRecorder.onerror = () => {
+      cleanupCameraSession();
     };
     mediaRecorder.onstop = () => {
       const flushAndDeliver = () => {
@@ -75,7 +156,10 @@ const Camera = forwardRef(function Camera({ onRecordingComplete, onCameraReady, 
           stopResolveRef.current({ blob, url });
           stopResolveRef.current = null;
         }
-        setRecording(false);
+        if (mountedRef.current) {
+          setRecording(false);
+        }
+        mediaRecorderRef.current = null;
       };
       setTimeout(flushAndDeliver, 150);
     };
@@ -100,6 +184,7 @@ const Camera = forwardRef(function Camera({ onRecordingComplete, onCameraReady, 
   useImperativeHandle(ref, () => ({
     startRecording,
     stopRecording,
+    cleanup: cleanupCameraSession,
     isRecording: () => mediaRecorderRef.current?.state === "recording",
     isReady: cameraReady,
   }), [cameraReady]);

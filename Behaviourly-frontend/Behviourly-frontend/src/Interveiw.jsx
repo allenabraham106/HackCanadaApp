@@ -52,6 +52,13 @@ export default function Interview() {
   const cameraRef = useRef(null)
   const lastRecordingBlobRef = useRef(null)
 
+  useEffect(() => {
+    return () => {
+      stopSpeaking()
+      cameraRef.current?.cleanup?.()
+    }
+  }, [])
+
   // Check if backend is up and AI (Gemini) is configured
   useEffect(() => {
     const base = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001").replace(/\/$/, "")
@@ -302,6 +309,9 @@ export default function Interview() {
       }
       setPresageLoading(false)
     }
+    if (currentQ == questions.length - 1) {
+      cameraRef.current?.cleanup?.()
+    }
   }
 
   function handleNextQuestion() {
@@ -335,19 +345,6 @@ export default function Interview() {
         <span className="interview-label">Practicing for</span>
         <span className="interview-context">{company && role ? `${company} · ${role}` : role}</span>
       </div>
-
-      {/* Backend & AI status — so user knows if analysis will work */}
-      {backendStatus !== null && (
-        <div className={`interview-backend-status interview-backend-status--${backendStatus}`}>
-          <span>Backend: {backendStatus === "ok" ? "connected" : "disconnected"}</span>
-          {backendStatus === "ok" && (
-            <span> · AI: {aiReady === true ? "ready" : "not configured (set GEMINI_API_KEY)"}</span>
-          )}
-          {backendStatus === "error" && (
-            <span> — Start the backend (e.g. <code>uv run main.py</code> in hackcanada-backend)</span>
-          )}
-        </div>
-      )}
 
       {/* Questions — only visible after Start interview, hidden when answer submitted */}
       {started && !complete && !answerSubmitted && (
@@ -395,7 +392,11 @@ export default function Interview() {
                 <>
                   <div className="interview-summary-vitals-grid">
                     {vitalsByQuestion.map((v, i) => (
-                      <div key={i} className="interview-summary-vitals-card">
+                      <div 
+                        key={i} 
+                        className="interview-summary-vitals-card" 
+                        style={vitalsByQuestion.length % 2 !== 0 && i === vitalsByQuestion.length - 1 ? { gridColumn: "1 / -1" } : {}}
+                      >
                       <div className="interview-summary-vitals-card-header">
                         <span className="interview-summary-vitals-q">Q{v.questionIndex + 1}</span>
                         <span className={`interview-summary-vitals-pill interview-vibes--${v.stressLevel}`}>
@@ -518,7 +519,7 @@ export default function Interview() {
               onClick={() => {
                 stopSpeaking()
                 setEnded(true)
-                cameraRef.current?.stopRecording?.()
+                cameraRef.current?.cleanup?.()
               }}
               className="interview-end-btn"
             >

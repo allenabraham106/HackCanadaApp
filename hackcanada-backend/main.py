@@ -648,9 +648,11 @@ async def analyze_answer(body: dict):
 
     prompt = f"""
     Interview question: "{question}"
-    Candidate's answer: "{answer}"
+    Candidate's transcribed audio: "{answer}"
 
-    Rate this answer. Return ONLY a JSON object, no markdown:
+    IMPORTANT: The candidate's transcribed audio might have captured the AI interviewer asking the question at the very beginning. You MUST ignore the interviewer's voice/question in the transcript and ONLY grade the candidate's actual response.
+
+    Rate the candidate's answer. Return ONLY a JSON object, no markdown:
     {{
         "rating": "strong" or "mediocre" or "weak",
         "score": 1-10,
