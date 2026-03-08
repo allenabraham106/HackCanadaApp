@@ -1,14 +1,27 @@
-import { useAuth0 } from "@auth0/auth0-react";
+import { useUser } from "../UserContext";
 import "./ProfilePage.css";
 
 export default function ProfilePage() {
-  const { user, logout, isAuthenticated } = useAuth0();
+  const { user, loading } = useUser();
 
-  if (!isAuthenticated || !user) {
+  if (loading) {
     return (
       <div className="profile-page">
         <div className="profile-card">
-          <p className="profile-guest">You’re not signed in. Sign-in can be enabled later.</p>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="profile-page">
+        <div className="profile-card">
+          <p className="profile-guest">You're not signed in.</p>
+          <button className="profile-logout" onClick={() => window.location.href = "http://localhost:8000/login"}>
+            Sign in
+          </button>
         </div>
       </div>
     );
@@ -21,17 +34,14 @@ export default function ProfilePage() {
           {user.picture ? (
             <img src={user.picture} alt="" />
           ) : (
-            <span>{user.name?.charAt(0) || user.nickname?.charAt(0) || "?"}</span>
+            <span>{user.name?.charAt(0) || "?"}</span>
           )}
         </div>
         <h1 className="profile-name">{user.name || "User"}</h1>
         {user.email && (
           <p className="profile-email">{user.email}</p>
         )}
-        {user.nickname && user.nickname !== user.name && (
-          <p className="profile-nickname">@{user.nickname}</p>
-        )}
-        <button className="profile-logout" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
+        <button className="profile-logout" onClick={() => window.location.href = "http://localhost:8000/logout"}>
           Sign out
         </button>
       </div>
