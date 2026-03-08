@@ -82,11 +82,7 @@ export default function InterviewContextPage() {
 
   const generatedJobDescription =
     briefing?.job_description ||
-    (briefing?.role?.responsibilities?.length
-      ? `This ${briefing.role.title || role} role at ${briefing.company?.name || company} emphasizes: ${briefing.role.responsibilities.join(
-          ", "
-        )}.`
-      : "Job description is being generated from your selected role.");
+    `This ${briefing?.role?.title || role} role at ${briefing?.company?.name || company} is being summarized for interview preparation.`;
 
   return (
     <div className="interview-context-page">
@@ -117,12 +113,20 @@ export default function InterviewContextPage() {
       )}
 
       {error && (
-        <section className="interview-context-card">
-          <h3>Unable to Load Briefing</h3>
-          <p>{error}</p>
-        </section>
-      )}
+        <>
+          <section className="interview-context-card">
+            <h3>Unable to Load Briefing</h3>
+            <p>{error}</p>
+          </section>
 
+          <div className="interview-context-grid">
+            <SectionList title="Key Values" items={["Unable to fetch key values"]} />
+            <SectionList title="Emphasized Skills" items={["Unable to fetch required skills"]} />
+            <SectionList title="Tailored Tips" items={["Unable to fetch tailored tips"]} />
+          </div>
+        </>
+      )}
+      
       {!loading && !error && briefing && (
         <>
           <section className="interview-context-card">
@@ -136,17 +140,9 @@ export default function InterviewContextPage() {
           </section>
 
           <div className="interview-context-grid">
-            <SectionList title="Company Values" items={briefing.company?.values} />
-            <SectionList
-              title="Role Responsibilities"
-              items={briefing.role?.responsibilities}
-            />
-            <SectionList title="Skills Emphasized" items={briefing.skills_emphasized} />
+            <SectionList title="Key Values" items={briefing.company?.values} />
+            <SectionList title="Emphasized Skills" items={briefing.skills_emphasized} />
             <SectionList title="Tailored Tips" items={briefing.tailored_tips} />
-            <SectionList
-              title="Likely Interview Focus"
-              items={briefing.likely_interview_focus}
-            />
           </div>
 
           <section className="interview-context-card">
@@ -163,7 +159,11 @@ export default function InterviewContextPage() {
         <button
           type="button"
           className="interview-context-primary"
-          onClick={() => navigate("/interview", { state: { company, role, interviewId: state?.interviewId } })}
+          onClick={() =>
+            navigate("/interview", {
+              state: { company, role, interviewId: state?.interviewId },
+            })
+          }
         >
           Start Practice Interview
         </button>

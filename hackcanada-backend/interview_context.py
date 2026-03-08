@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field, ValidationError
 
 router = APIRouter(tags=["interview_context"])
 
-# Requests the model
+
 class InterviewContextRequest(BaseModel):
     company_name: str = Field(..., min_length=1)
     role_title: str = Field(..., min_length=1)
     job_description: Optional[str] = None
 
-# The response models
+
 class CompanyInfo(BaseModel):
     name: str
     summary: str
@@ -23,7 +23,6 @@ class CompanyInfo(BaseModel):
 
 class RoleInfo(BaseModel):
     title: str
-    responsibilities: List[str]
 
 
 class InterviewContextResponse(BaseModel):
@@ -31,10 +30,9 @@ class InterviewContextResponse(BaseModel):
     role: RoleInfo
     skills_emphasized: List[str]
     tailored_tips: List[str]
-    likely_interview_focus: List[str]
     confidence_note: str
 
-# Helpers
+
 def build_prompt(payload: InterviewContextRequest) -> str:
     job_desc_text = payload.job_description.strip() if payload.job_description else "Not provided."
 
@@ -60,37 +58,33 @@ Output schema:
     "values": ["string", "string", "string"]
   }},
   "role": {{
-    "title": "string",
-    "responsibilities": ["string", "string", "string"]
+    "title": "string"
   }},
   "skills_emphasized": ["string", "string", "string", "string"],
   "tailored_tips": ["string", "string", "string"],
-  "likely_interview_focus": ["string", "string", "string"],
   "confidence_note": "State whether this is based mostly on the job description or inferred from company + role only."
 }}
 
 Rules:
 - Keep lists concise and useful.
 - Prefer interview-relevant information over generic company trivia.
+- Company values should reflect what the company likely cares about in employees.
+- skills_emphasized should be the main skills this role is likely looking for.
+- tailored_tips should be specific to succeeding in an interview for this company and role.
 - If the job description is missing, infer carefully from the company and role title and say so in confidence_note.
 - Keep everything practical for a student preparing for an interview.
 """.strip()
 
 
 def extract_json_text(raw_text: str) -> str:
-    """
-    Handles cases where the model accidentally returns ```json ... ```
-    """
     text = raw_text.strip()
 
     if text.startswith("```"):
         lines = text.splitlines()
 
-        # Drop first fence line
         if lines:
             lines = lines[1:]
 
-        # Drop last fence line if present
         if lines and lines[-1].strip().startswith("```"):
             lines = lines[:-1]
 
@@ -98,7 +92,7 @@ def extract_json_text(raw_text: str) -> str:
 
     return text
 
-# Route
+
 @router.post("/interview_context", response_model=InterviewContextResponse)
 async def generate_interview_context(
     payload: InterviewContextRequest,
@@ -112,7 +106,6 @@ async def generate_interview_context(
     prompt = build_prompt(payload)
 
     try:
-        # generate_content is sync for most Gemini SDK clients/models; use a thread
         if hasattr(model, "generate_content"):
             response = await asyncio.to_thread(model.generate_content, prompt)
         elif hasattr(model, "models") and hasattr(model.models, "generate_content"):
@@ -131,7 +124,6 @@ async def generate_interview_context(
         json_text = extract_json_text(raw_text)
         data = json.loads(json_text)
 
-        # Validate structure before returning
         validated = InterviewContextResponse.model_validate(data)
         return validated
 
@@ -152,4 +144,3 @@ async def generate_interview_context(
             status_code=500,
             detail=f"Failed to generate interview context: {str(e)}"
         )
-
