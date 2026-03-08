@@ -195,7 +195,7 @@ If this IS an interview invitation or scheduling email:
     "role": "job title/role",
     "interview_date": "date and time if mentioned, otherwise null",
     "interview_type": "behavioral/technical/phone screen/onsite/panel/unknown",
-    "summary": "A brief 1-2 sentence summary of the email, written in the second person (Omit time and date details)"
+    "summary": "A brief sentence in the format of You have been invited to a x type of interview for y position at z company or some similar variation, ending in exclamation mark"
 }}
 
 If this is NOT an interview invitation (e.g. marketing, newsletter, job board alert, rejection):
