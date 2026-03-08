@@ -28,7 +28,7 @@ const Camera = forwardRef(function Camera({ onRecordingComplete, onCameraReady, 
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
       });
       const video = videoRef.current;
@@ -57,7 +57,10 @@ const Camera = forwardRef(function Camera({ onRecordingComplete, onCameraReady, 
     if (!stream) return;
     chunksRef.current = [];
 
-    const mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "video/webm",
+      videoBitsPerSecond: 2500000,
+    });
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };

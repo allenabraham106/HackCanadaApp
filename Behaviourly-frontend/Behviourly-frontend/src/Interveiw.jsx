@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useLocation } from "react-router-dom"
 import Camera from "./Camera"
-import { speakText } from "./elevenLabs"
+import { speakText, stopSpeaking } from "./elevenLabs"
 import "./Interview.css"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001"
@@ -45,7 +45,7 @@ export default function Interview() {
       fetch(`${AUTH_API_BASE_URL}/interviews/${interviewId}/questions`, authOpts)
         .then((res) => res.json())
         .then((data) => {
-          const list = questionTexts(data?.questions)
+          const list = questionTexts(data?.questions).slice(0, 3)
           if (list.length > 0) {
             setQuestions(list)
             setApiError(null)
@@ -58,7 +58,7 @@ export default function Interview() {
           })
             .then((r) => r.json())
             .then((gen) => {
-              const generated = questionTexts(gen?.questions)
+              const generated = questionTexts(gen?.questions).slice(0, 3)
               if (generated.length > 0) {
                 setQuestions(generated)
                 setApiError(null)
@@ -84,7 +84,7 @@ export default function Interview() {
       .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
         if (ok && Array.isArray(data?.questions) && data.questions.length > 0) {
-          setQuestions(data.questions)
+          setQuestions(data.questions.slice(0, 3))
           setApiError(null)
         } else {
           setQuestions(FALLBACK_QUESTIONS)
@@ -128,6 +128,7 @@ export default function Interview() {
   }
 
   function handleComplete() {
+    stopSpeaking()
     cameraRef.current?.stopRecording?.()
     setAnswerSubmitted(true)
   }
@@ -162,8 +163,6 @@ export default function Interview() {
         <span className="interview-label">Practicing for</span>
         <span className="interview-context">{company && role ? `${company} · ${role}` : role}</span>
       </div>
-
-      {apiError && <div className="interview-api-error">{apiError}</div>}
 
       {/* Questions — only visible after Start interview, hidden when answer submitted */}
       {started && !complete && !answerSubmitted && (
@@ -229,6 +228,7 @@ export default function Interview() {
             <button
               type="button"
               onClick={() => {
+                stopSpeaking()
                 setEnded(true)
                 cameraRef.current?.stopRecording?.()
               }}
