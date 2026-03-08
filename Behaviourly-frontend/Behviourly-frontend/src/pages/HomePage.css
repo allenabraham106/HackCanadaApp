@@ -90,6 +90,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  animation: page-fade-up 0.5s ease-out 0.05s backwards;
 }
 
 .home-add-btn:hover {

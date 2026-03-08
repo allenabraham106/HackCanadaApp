@@ -35,6 +35,38 @@ import requests
 from dotenv import load_dotenv
 from google import genai
 
+from twilio.rest import Client
+
+def send_whatsapp_notification(company, role, date=None):
+    """Sends a WhatsApp message via Twilio when a new interview is found."""
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    from_whatsapp = os.getenv("TWILIO_WHATSAPP_NUMBER")
+    to_whatsapp = os.getenv("MY_PERSONAL_PHONE")
+
+    if not all([account_sid, auth_token, from_whatsapp, to_whatsapp]):
+        logger.warning("Twilio credentials missing. Skipping WhatsApp notification.")
+        return
+
+    try:
+        client = Client(account_sid, auth_token)
+        
+        # Format the message
+        date_str = f" on {date}" if date else ""
+        message_body = (
+            f"🚀 *New Interview Detected!*\n\n"
+            f"You have an interview for the *{role}* position at *{company}*{date_str}.\n\n"
+            f"Your AI Prep Kit is ready on your dashboard!"
+        )
+
+        message = client.messages.create(
+            from_=from_whatsapp,
+            body=message_body,
+            to=to_whatsapp
+        )
+        logger.info(f"WhatsApp notification sent! SID: {message.sid}")
+    except Exception as e:
+        logger.error(f"Failed to send WhatsApp message: {e}")
 
 load_dotenv()
 logging.basicConfig(
@@ -420,6 +452,11 @@ def scan_user(user: User, db) -> int:
         new_count += 1
         logger.info(f"    Saved interview + {len(questions)} questions.")
 
+        send_whatsapp_notification(
+            company=analysis["company"],
+            role=analysis["role"],
+            date=analysis.get("interview_date")
+        )
     return new_count
 
 
