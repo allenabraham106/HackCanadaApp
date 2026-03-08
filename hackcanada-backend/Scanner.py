@@ -448,15 +448,21 @@ def scan_user(user: User, db) -> int:
         else:
             logger.warning(f"    Could not generate context briefing — skipping.")
 
-        db.commit()
-        new_count += 1
-        logger.info(f"    Saved interview + {len(questions)} questions.")
+        try:
+            db.commit()
+            new_count += 1
+            existing_ids.add(email["id"]) # Mark as processed
+            logger.info(f"    Saved interview + {len(questions)} questions.")
 
-        send_whatsapp_notification(
-            company=analysis["company"],
-            role=analysis["role"],
-            date=analysis.get("interview_date")
-        )
+            send_whatsapp_notification(
+                company=analysis["company"],
+                role=analysis["role"],
+                date=analysis.get("interview_date")
+            )
+        except Exception as e:
+            db.rollback()
+            logger.error(f"    Failed to save interview {email['id']} to DB (Likely duplicate). Skipping. Error: {e}")
+
     return new_count
 
 
@@ -469,6 +475,7 @@ def run_scan():
 
         total = 0
         for user in users:
+            user_email = user.email  # Grab this NOW before any potential DB rollbacks
             try:
                 count = scan_user(user, db)
                 total += count
@@ -478,8 +485,8 @@ def run_scan():
                 db.commit()
 
             except Exception as e:
-                logger.error(f"  Error scanning {user.email}: {e}")
-                db.rollback()
+                db.rollback() # Always rollback before logging if a top-level error happens
+                logger.error(f"  Error scanning {user_email}: {e}")
                 continue
 
         logger.info(f"Scan complete. {total} new interview(s) found across {len(users)} user(s).")
