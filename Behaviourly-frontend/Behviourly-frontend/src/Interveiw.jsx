@@ -4,7 +4,8 @@ import Camera from "./Camera"
 import { speakText } from "./elevenLabs"
 import "./Interview.css"
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001"
+const AUTH_API_BASE_URL = import.meta.env.VITE_AUTH_API_BASE_URL || "http://localhost:8000"
 
 const FALLBACK_QUESTIONS = [
   "Tell me about yourself.",
@@ -12,10 +13,17 @@ const FALLBACK_QUESTIONS = [
   "Where do you see yourself in five years?",
 ]
 
+function questionTexts(questions) {
+  return Array.isArray(questions)
+    ? questions.map((q) => (typeof q === "string" ? q : q?.question)).filter(Boolean)
+    : []
+}
+
 export default function Interview() {
   const { state } = useLocation()
   const company = state?.company
   const role = state?.role || "software engineer"
+  const interviewId = state?.interviewId
 
   const [questions, setQuestions] = useState([])
   const [currentQ, setCurrentQ] = useState(0)
@@ -27,9 +35,46 @@ export default function Interview() {
   const [lastRecordingUrl, setLastRecordingUrl] = useState(null)
   const cameraRef = useRef(null)
 
-  // Fetch questions for this company and role
+  // Fetch questions: from Auth (Gemini/stored) when interviewId present, else FastAPI mock-interview
   useEffect(() => {
     fetch(`${API_BASE_URL}/reset-session`, { method: "POST" }).catch(() => {})
+
+    const authOpts = { credentials: "include" }
+
+    if (interviewId) {
+      fetch(`${AUTH_API_BASE_URL}/interviews/${interviewId}/questions`, authOpts)
+        .then((res) => res.json())
+        .then((data) => {
+          const list = questionTexts(data?.questions)
+          if (list.length > 0) {
+            setQuestions(list)
+            setApiError(null)
+            setLoading(false)
+            return
+          }
+          return fetch(`${AUTH_API_BASE_URL}/interviews/${interviewId}/generate-questions`, {
+            method: "POST",
+            ...authOpts,
+          })
+            .then((r) => r.json())
+            .then((gen) => {
+              const generated = questionTexts(gen?.questions)
+              if (generated.length > 0) {
+                setQuestions(generated)
+                setApiError(null)
+              } else {
+                setQuestions(FALLBACK_QUESTIONS)
+                setApiError(gen?.error || "Generated no questions; using defaults.")
+              }
+            })
+        })
+        .catch(() => {
+          setQuestions(FALLBACK_QUESTIONS)
+          setApiError("Could not load interview questions. Using defaults.")
+        })
+        .finally(() => setLoading(false))
+      return
+    }
 
     fetch(`${API_BASE_URL}/mock-interview`, {
       method: "POST",
@@ -53,7 +98,7 @@ export default function Interview() {
         setApiError("Could not reach the server. Using default questions.")
         setLoading(false)
       })
-  }, [company, role])
+  }, [company, role, interviewId])
 
   // Speak question when it changes (only after interview started, not when ended)
   useEffect(() => {
@@ -79,9 +124,6 @@ export default function Interview() {
   }
 
   function handleRecordingComplete(blob, url) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     setLastRecordingUrl(url)
   }
 
@@ -95,19 +137,6 @@ export default function Interview() {
     setAnswerSubmitted(false)
     setLastRecordingUrl(null)
     setCurrentQ(prev => prev + 1)
-=======
-<<<<<<< HEAD
-    // Recording stopped — blob can be processed/uploaded here. Advancement is handled by the Next Question button.
-=======
-    // Recording stopped — advancement is handled by Next Question button
->>>>>>> a042f585fc6bcf6de42f3ab70b0a6f461792996c
->>>>>>> 2d8e1b476f3a343e2c6c28799171f4a6d7b0c33d
-=======
-    // Recording stopped — advancement is handled by Next Question button
->>>>>>> b6807ff (fixing merge issues)
-=======
-    // Recording stopped — advancement is handled by Next Question button
->>>>>>> d436df0a43213068412401ce2ef57f9d7312fbed
   }
 
   const complete = ended || currentQ >= questions.length

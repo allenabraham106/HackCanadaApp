@@ -67,7 +67,17 @@ if (userLoading || dataLoading) {
       <section className="home-section">
         <h2 className="home-section-title">Detected Interviews</h2>
         {interviews.length === 0 ? (
-          <p className="empty-state">No interviews found yet. We're scanning your inbox!</p>
+          <div className="empty-state-wrap">
+            <p className="empty-state">No interviews found yet. We're scanning your inbox!</p>
+            <p className="empty-state-hint">You can still practice with AI-generated questions for any company and role.</p>
+            <button
+              type="button"
+              className="home-card-practice empty-state-cta"
+              onClick={() => navigate("/interview-context")}
+            >
+              Start a practice interview
+            </button>
+          </div>
         ) : (
           <ul className="home-cards">
             {interviews.map((job, i) => (
@@ -90,7 +100,7 @@ if (userLoading || dataLoading) {
                     <button
                       type="button"
                       className="home-card-practice"
-                      onClick={() => navigate("/interview-context")}
+                      onClick={() => navigate("/interview-context", { state: { interviewId: job.id, company: job.company, role: job.role } })}
                     >
                       View Prep Kit
                     </button>

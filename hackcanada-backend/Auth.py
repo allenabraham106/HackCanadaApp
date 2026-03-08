@@ -35,11 +35,13 @@
 #   pip install flask requests python-dotenv sqlalchemy
 # ─────────────────────────────────────────────────────────────────────────────
 
+import json
 import os
 import time
 import secrets
 import logging
 import requests
+import uuid
 from functools import wraps
 from urllib.parse import urlencode
 from datetime import datetime, timezone
@@ -50,14 +52,28 @@ from sqlalchemy import create_engine, Column, String, DateTime, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 from flask_cors import CORS
 
+# Optional Gemini for generating interview questions (same logic as Scanner)
+try:
+    from google import genai as _genai
+    _GEMINI_AVAILABLE = bool(os.getenv("GEMINI_API_KEY"))
+except Exception:
+    _genai = None
+    _GEMINI_AVAILABLE = False
+
 load_dotenv()
+# Load .env from repo root when running from hackcanada-backend/
+_root_env = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+if os.path.isfile(_root_env):
+    load_dotenv(_root_env)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-in-prod")
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
+CORS(app, supports_credentials=True, origins=[
+    "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://127.0.0.1:5173", "http://127.0.0.1:5174", "http://127.0.0.1:5175"
+])
 
 AUTH0_DOMAIN        = os.getenv("AUTH0_DOMAIN")         # e.g. dev-xxxx.us.auth0.com
 AUTH0_CLIENT_ID     = os.getenv("AUTH0_CLIENT_ID")       # Regular Web App (login)
@@ -455,6 +471,101 @@ def get_interview_questions(interview_id):
                     "category": q.category,
                     "tip":      q.tip,
                 }
+                for q in questions
+            ],
+        })
+    finally:
+        db.close()
+
+
+# ─── Route: POST /interviews/<id>/generate-questions ─────────────────────────
+# Uses Gemini to generate behavioral questions for this interview and saves them.
+# Idempotent: can be called again to replace/add; existing questions are cleared first.
+
+def _gemini_generate_questions(company: str, role: str, interview_type: str) -> list[dict]:
+    """Generate 8–10 behavioral questions via Gemini (same format as Scanner)."""
+    if not _GEMINI_AVAILABLE or _genai is None:
+        return []
+    client = _genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    prompt = f"""Generate 8-10 behavioral interview questions that a candidate would likely be asked
+for a {role} position at {company}. The interview type is: {interview_type or "behavioral"}.
+
+Focus on:
+- Questions specific to {company}'s known culture and values
+- Questions relevant to the {role} role
+- Common behavioral patterns (STAR method questions)
+
+Respond ONLY with a JSON array, no markdown, no backticks, no extra text.
+Each item should have:
+{{
+    "question": "the interview question",
+    "category": "one of: leadership, teamwork, conflict resolution, problem solving, communication, adaptability, initiative, time management",
+    "tip": "brief advice on how to approach this question well"
+}}"""
+    try:
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_QUESTION_MODEL", "gemini-2.0-flash"),
+            contents=prompt,
+        )
+        text = (response.text or "").strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+        out = json.loads(text)
+        return out if isinstance(out, list) else []
+    except (json.JSONDecodeError, Exception) as e:
+        logger.error(f"Gemini question generation failed for {company} / {role}: {e}")
+        return []
+
+
+@app.route("/interviews/<interview_id>/generate-questions", methods=["POST"])
+def generate_interview_questions(interview_id):
+    user_session = session.get("user")
+    if not user_session:
+        return jsonify({"error": "Not authenticated."}), 401
+    if not _GEMINI_AVAILABLE:
+        return jsonify({"error": "Gemini is not configured (GEMINI_API_KEY)."}), 503
+
+    db = SessionLocal()
+    try:
+        interview = db.query(Interview).filter_by(
+            id=interview_id, user_id=user_session["sub"]
+        ).first()
+        if not interview:
+            return jsonify({"error": "Interview not found."}), 404
+
+        # Remove existing questions so we replace with fresh Gemini set
+        db.query(InterviewQuestion).filter_by(interview_id=interview_id).delete()
+
+        questions_data = _gemini_generate_questions(
+            interview.company,
+            interview.role,
+            interview.interview_type or "behavioral",
+        )
+        if not questions_data:
+            return jsonify({"error": "Failed to generate questions.", "questions": []}), 502
+
+        for q in questions_data:
+            db.add(InterviewQuestion(
+                id=str(uuid.uuid4()),
+                interview_id=interview_id,
+                question=q.get("question", ""),
+                category=q.get("category"),
+                tip=q.get("tip"),
+            ))
+        db.commit()
+
+        questions = (
+            db.query(InterviewQuestion)
+            .filter_by(interview_id=interview_id)
+            .all()
+        )
+        return jsonify({
+            "interview": {"company": interview.company, "role": interview.role},
+            "questions": [
+                {"id": q.id, "question": q.question, "category": q.category, "tip": q.tip}
                 for q in questions
             ],
         })

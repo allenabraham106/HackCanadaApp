@@ -15,9 +15,12 @@ Keep this terminal open. The frontend is configured to call `http://localhost:80
 
 **Requirements:** Python 3.10+, and a `.env` in this folder or the repo root with `GEMINI_API_KEY` set.
 
-## Auth (Flask, optional)
+## Auth (Flask, Gmail + Gemini questions)
 
-The Auth server serves `/login` and `/callback` for Google sign-in. **It must be running** for "Try it for free" or you’ll get "localhost sent an invalid response" when the app redirects to login.
+The Auth server (port **8000**) serves `/login` and `/callback` for Google sign-in, plus:
+- **`/interviews`** – list detected interviews (from Scanner).
+- **`/interviews/<id>/questions`** – get stored Gemini questions for an interview.
+- **`POST /interviews/<id>/generate-questions`** – generate and save Gemini behavioral questions for an interview (uses `GEMINI_API_KEY`; same format as Scanner). The app calls this when you open a detected interview that has no questions yet. **It must be running** for "Try it for free" or you’ll get "localhost sent an invalid response" when the app redirects to login.
 
 1. **Create `.env`** from the example:
    ```bash

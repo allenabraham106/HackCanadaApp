@@ -1,11 +1,11 @@
 {
   "name": "hackcanadaapp",
   "version": "1.0.0",
-<<<<<<< HEAD
   "private": true,
+  "description": "",
   "scripts": {
     "start": "concurrently --names \"BACKEND,FRONTEND\" -c \"blue,magenta\" \"npm run backend\" \"npm run frontend\"",
-    "backend": "cd hackcanada-backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "backend": "cd hackcanada-backend && uvicorn main:app --reload --host 0.0.0.0 --port 8001",
     "frontend": "npm run dev --prefix Behaviourly-frontend/Behviourly-frontend",
     "prestart": "npm install && npm install --prefix Behaviourly-frontend/Behviourly-frontend"
   },
@@ -13,24 +13,3 @@
     "concurrently": "^9.1.0"
   }
 }
-=======
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/allenabraham106/HackCanadaApp.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/allenabraham106/HackCanadaApp/issues"
-  },
-  "homepage": "https://github.com/allenabraham106/HackCanadaApp#readme",
-  "dependencies": {}
-}
->>>>>>> 2d8e1b476f3a343e2c6c28799171f4a6d7b0c33d

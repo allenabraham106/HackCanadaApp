@@ -164,3 +164,29 @@
   opacity: 0.95;
   transform: scale(1.02);
 }
+
+.empty-state-wrap {
+  padding: 2rem 1.5rem;
+  text-align: center;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px dashed var(--border);
+  animation: page-fade-up 0.5s ease-out backwards;
+}
+
+.empty-state {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: #64748b;
+}
+
+.empty-state-hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.9375rem;
+  color: #94a3b8;
+}
+
+.empty-state-cta {
+  display: inline-block;
+  margin-top: 0;
+}
